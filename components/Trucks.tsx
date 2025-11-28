@@ -4,6 +4,7 @@ import { Truck, Owner } from '../types';
 import { Badge, getStatusBadgeVariant } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
+import { LicensePlate } from './ui/LicensePlate';
 import { Truck as TruckIcon, PenTool, Trash2 } from 'lucide-react';
 
 export const Trucks: React.FC = () => {
@@ -66,19 +67,23 @@ export const Trucks: React.FC = () => {
               {ownerTrucks.map(truck => (
                 <div key={truck.truck_id} className="card bg-base-100 shadow-lg hover:shadow-xl transition-all">
                   <div className="card-body p-5">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 bg-base-200 rounded-lg">
-                          <TruckIcon size={24} />
-                        </div>
-                        <div>
-                          <h3 className="font-mono font-bold text-lg">{truck.license_plate}</h3>
-                          <p className="text-xs opacity-60">{truck.truck_model}</p>
-                        </div>
-                      </div>
-                      <Badge variant={getStatusBadgeVariant(truck.status)}>{truck.status}</Badge>
+                    <div className="flex justify-between items-start mb-4">
+                       {/* License Plate Display */}
+                       <LicensePlate plateNumber={truck.license_plate} variant="sm" />
+                       <Badge variant={getStatusBadgeVariant(truck.status)}>{truck.status}</Badge>
                     </div>
-                    <div className="grid grid-cols-2 gap-y-1 text-sm opacity-70 mb-2">
+
+                    <div className="flex items-center gap-3 mb-2 opacity-80">
+                         <div className="p-2 bg-base-200 rounded-lg">
+                           <TruckIcon size={20} />
+                         </div>
+                         <div>
+                           <p className="font-bold text-sm">{truck.truck_model}</p>
+                           <p className="text-xs opacity-60">Modèle</p>
+                         </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-y-1 text-sm opacity-70 mb-2 mt-2 pt-2 border-t border-base-200/50">
                       <span>Type:</span> <span className="text-right font-medium">{truck.truck_type}</span>
                       <span>Capacité:</span> <span className="text-right font-medium">{(truck.capacity_kg / 1000).toFixed(1)} T</span>
                       <span>Année:</span> <span className="text-right font-medium">{truck.manufacture_year || '-'}</span>

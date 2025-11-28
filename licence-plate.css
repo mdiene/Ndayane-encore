@@ -1,0 +1,161 @@
+/* SENEGAL LICENSE PLATE STYLES 
+   ----------------------------
+*/
+
+/* Import the required fonts for authenticity */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Saira:wght@700;900&display=swap');
+
+/* Scope variables to the plate container to avoid global conflicts */
+.plate-container {
+    --plate-border: #000000;
+    --plate-bg: #ffffff;
+    --strip-blue: #003399;
+    --senegal-green: #00853f;
+    --senegal-yellow: #fdef42;
+    --senegal-red: #e31b23;
+    --text-color: #000000;
+
+    /* Plate Dimensions & Base Style */
+    width: 520px; 
+    height: 112px;
+    background-color: var(--plate-bg);
+    border: 5px solid var(--plate-border);
+    border-radius: 10px;
+    display: flex;
+    position: relative;
+    box-sizing: border-box; /* Ensures padding/border doesn't increase width */
+    box-shadow: 
+        0 10px 25px -5px rgba(0, 0, 0, 0.3),
+        inset 0 0 0 2px rgba(255,255,255,0.5);
+    overflow: hidden;
+    background-image: radial-gradient(circle, rgba(0,0,0,0.02) 1px, transparent 1px);
+    background-size: 4px 4px;
+    
+    /* Font defaults */
+    font-family: 'Oswald', sans-serif;
+    line-height: normal;
+    text-transform: uppercase;
+    user-select: none;
+}
+
+/* --- Left Blue Strip --- */
+.plate-container .blue-strip {
+    width: 55px;
+    background-color: var(--strip-blue);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    box-sizing: border-box;
+    color: white;
+    position: relative;
+    flex-shrink: 0; /* Prevent shrinking if text is long */
+}
+
+.plate-container .country-code {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 5px;
+}
+
+/* --- Flag & Star --- */
+.plate-container .flag {
+    width: 36px;
+    height: 24px;
+    background: linear-gradient(
+        90deg, 
+        var(--senegal-green) 33.33%, 
+        var(--senegal-yellow) 33.33%, var(--senegal-yellow) 66.66%, 
+        var(--senegal-red) 66.66%
+    );
+    position: relative;
+    margin-top: 5px;
+    box-shadow: 0 0 2px rgba(0,0,0,0.3);
+}
+
+.plate-container .star {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px; 
+    height: 14px;
+    display: block;
+}
+
+/* --- Main Numbering Area --- */
+.plate-container .main-content {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Saira', 'Oswald', sans-serif;
+    font-weight: 900;
+    font-size: 85px;
+    color: var(--text-color);
+    letter-spacing: -2px;
+    position: relative;
+    padding-left: 10px;
+    white-space: nowrap;
+}
+
+/* --- Separators --- */
+.plate-container .separator-hyphen {
+    display: inline-block;
+    width: 14px;
+    height: 6px;
+    background-color: black;
+    margin: 0 12px;
+    margin-top: 12px; /* Visual adjustment for font center */
+    border-radius: 1px;
+}
+
+/* --- QR Placeholder --- */
+.plate-container .qr-placeholder {
+    position: absolute;
+    top: 6px;
+    left: 65px;
+    width: 20px;
+    height: 20px;
+    opacity: 0.4;
+    background-image: repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 2px, transparent 4px),
+                      repeating-linear-gradient(135deg, #000 0, #000 2px, transparent 2px, transparent 4px);
+    border: 1px solid #ccc;
+    pointer-events: none;
+}
+
+/* --- Right Region Stack --- */
+.plate-container .region-stack {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding-right: 15px;
+    padding-left: 10px;
+    font-weight: 700;
+    color: var(--text-color);
+    line-height: 1;
+    min-width: 60px; /* Ensures consistent width for region codes */
+}
+
+.plate-container .region-top {
+    font-size: 38px;
+    margin-bottom: 2px;
+}
+
+.plate-container .region-bottom {
+    font-size: 38px;
+}
+
+/* --- Responsive Scaling --- */
+@media (max-width: 600px) {
+    /* CSS transform logic is handled in the React component wrapper for better control, 
+       but this acts as a fallback or for non-React contexts */
+    .plate-container {
+        transform: scale(0.6);
+        transform-origin: left top;
+    }
+}
