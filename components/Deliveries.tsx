@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { DataService } from '../services/dataService';
 import { Delivery, Truck, Driver, Customer, Location, DeliveryDetail, Owner } from '../types';
@@ -228,7 +229,8 @@ export const Deliveries: React.FC = () => {
             </div>
         )}
 
-        {Object.entries(groupedDeliveries).map(([ownerName, items]) => {
+        {Object.entries(groupedDeliveries).map(([ownerName, rawItems]) => {
+          const items = rawItems as Delivery[];
           const totalWeight = items.reduce((acc, i) => acc + (i.cargo_weight_kg || 0), 0) / 1000;
           return (
             <div key={ownerName} className="space-y-4">

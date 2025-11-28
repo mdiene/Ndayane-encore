@@ -10,11 +10,12 @@ import {
   Menu, 
   Search,
   UserCircle,
-  Palette
+  Palette,
+  X
 } from 'lucide-react';
 
 export const Layout: React.FC = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
   
   // DaisyUI Themes List
   const themes = [
@@ -35,40 +36,66 @@ export const Layout: React.FC = () => {
     { to: '/settings', icon: Settings, label: 'Paramètres' },
   ];
 
+  const handleNavClick = () => {
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  };
+
   return (
-    <div className="flex h-screen bg-base-100 text-base-content overflow-hidden">
+    <div className="flex h-screen bg-base-100 text-base-content overflow-hidden relative">
+      {/* Mobile Backdrop */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-20 md:hidden transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside 
-        className={`${
-          isSidebarOpen ? 'w-64' : 'w-20'
-        } hidden md:flex flex-col border-r border-base-300 bg-base-200 transition-all duration-300 z-20`}
+        className={`
+          fixed md:relative top-0 left-0 h-full z-30
+          flex flex-col border-r border-base-300 bg-base-200 transition-all duration-300 ease-in-out
+          ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:translate-x-0 md:w-20'}
+        `}
       >
-        <div className="h-16 flex items-center justify-center border-b border-base-300">
+        <div className="h-16 flex items-center justify-center border-b border-base-300 relative">
           <div className="flex items-center gap-2 font-bold text-xl text-primary">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-content text-lg">M</div>
             {isSidebarOpen && <span>Mozaic</span>}
           </div>
+          {/* Mobile Close Button */}
+          <button 
+             className="md:hidden absolute right-2 btn btn-ghost btn-sm btn-circle"
+             onClick={() => setIsSidebarOpen(false)}
+           >
+             <X size={20} />
+           </button>
         </div>
 
-        <nav className="flex-1 py-6 flex flex-col gap-2 px-3">
+        <nav className="flex-1 py-6 flex flex-col gap-2 px-3 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={handleNavClick}
               className={({ isActive }) => `
-                flex items-center gap-4 px-3 py-3 rounded-lg transition-all duration-200
+                flex items-center gap-4 px-3 py-3 rounded-lg transition-all duration-200 overflow-hidden
                 ${isActive 
                   ? 'bg-primary text-primary-content shadow-md' 
                   : 'text-base-content/70 hover:bg-base-300 hover:text-base-content'}
               `}
             >
               <item.icon size={24} className="min-w-[24px]" />
-              {isSidebarOpen && <span className="whitespace-nowrap font-medium">{item.label}</span>}
+              <span className={`whitespace-nowrap font-medium transition-opacity duration-200 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 md:hidden'}`}>
+                {item.label}
+              </span>
             </NavLink>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-base-300">
+        <div className="p-4 border-t border-base-300 hidden md:block">
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="btn btn-ghost w-full"
@@ -79,11 +106,11 @@ export const Layout: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col h-full relative overflow-hidden">
+      <div className="flex-1 flex flex-col h-full relative overflow-hidden w-full">
         {/* Header */}
-        <header className="h-16 border-b border-base-300 bg-base-100/80 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-10">
+        <header className="h-16 border-b border-base-300 bg-base-100/80 backdrop-blur-md flex items-center justify-between px-4 sm:px-6 sticky top-0 z-10">
           <div className="flex items-center gap-4">
-            <button className="md:hidden btn btn-ghost btn-circle" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+            <button className="md:hidden btn btn-ghost btn-circle" onClick={() => setIsSidebarOpen(true)}>
               <Menu />
             </button>
             <div className="relative hidden sm:block">
@@ -96,7 +123,7 @@ export const Layout: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {/* DaisyUI Theme Selector */}
             <div className="dropdown dropdown-end">
               <div tabIndex={0} role="button" className="btn btn-ghost btn-sm">
@@ -137,7 +164,7 @@ export const Layout: React.FC = () => {
         </header>
 
         {/* Content Body */}
-        <main className="flex-1 overflow-auto p-6 bg-base-200/50">
+        <main className="flex-1 overflow-auto p-4 sm:p-6 bg-base-200/50 w-full">
           <div className="max-w-7xl mx-auto pb-10">
             <Outlet />
           </div>

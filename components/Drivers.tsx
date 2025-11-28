@@ -148,7 +148,9 @@ export const Drivers: React.FC = () => {
                 </div>
             )}
 
-            {Object.entries(groupedDrivers).map(([ownerName, ownerDrivers]) => (
+            {Object.entries(groupedDrivers).map(([ownerName, rawDrivers]) => {
+                const ownerDrivers = rawDrivers as typeof activeAssignments;
+                return (
                 <div key={ownerName} className="mb-6">
                     <div className="flex items-center gap-2 mb-3 pl-2 border-l-4 border-primary">
                         <h3 className="font-bold">{ownerName}</h3>
@@ -158,7 +160,7 @@ export const Drivers: React.FC = () => {
                         {ownerDrivers.map(d => <DriverCard key={d.driver_id} driver={d} />)}
                     </div>
                 </div>
-            ))}
+            )})}
         </div>
       </div>
 
