@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { DataService } from '../services/dataService';
 import { Customer, Location } from '../types';
@@ -9,6 +10,7 @@ export const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'customers' | 'routes'>('customers');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [usedCustomerNames, setUsedCustomerNames] = useState<Set<string>>(new Set());
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [currentCustomer, setCurrentCustomer] = useState<Partial<Customer>>({});
@@ -18,20 +20,65 @@ export const Settings: React.FC = () => {
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [c, l] = await Promise.all([DataService.getCustomers(), DataService.getLocations()]);
+    const [c, l, used] = await Promise.all([
+      DataService.getCustomers(), 
+      DataService.getLocations(),
+      DataService.getUsedCustomerNames()
+    ]);
     setCustomers(c);
     setLocations(l);
+    setUsedCustomerNames(used);
   };
 
   const handleOpenCustomerAdd = () => { setCurrentCustomer({}); setIsCustomerModalOpen(true); };
   const handleOpenCustomerEdit = (c: Customer) => { setCurrentCustomer(c); setIsCustomerModalOpen(true); };
-  const handleDeleteCustomer = async (id: number) => { if (window.confirm('Supprimer ?')) await DataService.deleteCustomer(id); loadData(); };
-  const handleCustomerSubmit = async (e: React.FormEvent) => { e.preventDefault(); if (currentCustomer.customer_id) await DataService.updateCustomer(currentCustomer.customer_id, currentCustomer); else await DataService.addCustomer(currentCustomer as any); setIsCustomerModalOpen(false); loadData(); };
+  
+  const handleDeleteCustomer = async (id: number) => { 
+    if (window.confirm('Supprimer ce client ?')) {
+       try {
+         await DataService.deleteCustomer(id); 
+         loadData();
+       } catch (e: any) {
+         alert("Erreur lors de la suppression: " + (e.message || JSON.stringify(e)));
+       }
+    }
+  };
+
+  const handleCustomerSubmit = async (e: React.FormEvent) => { 
+    e.preventDefault(); 
+    try {
+      if (currentCustomer.customer_id) await DataService.updateCustomer(currentCustomer.customer_id, currentCustomer); 
+      else await DataService.addCustomer(currentCustomer as any); 
+      setIsCustomerModalOpen(false); 
+      loadData();
+    } catch (e: any) {
+      alert("Erreur: " + (e.message || JSON.stringify(e)));
+    }
+  };
 
   const handleOpenLocationAdd = () => { setCurrentLocation({ distance_km: 0 }); setIsLocationModalOpen(true); };
   const handleOpenLocationEdit = (l: Location) => { setCurrentLocation(l); setIsLocationModalOpen(true); };
-  const handleDeleteLocation = async (id: number) => { if (window.confirm('Supprimer ?')) await DataService.deleteLocation(id); loadData(); };
-  const handleLocationSubmit = async (e: React.FormEvent) => { e.preventDefault(); if (currentLocation.location_id) await DataService.updateLocation(currentLocation.location_id, currentLocation); else await DataService.addLocation(currentLocation as any); setIsLocationModalOpen(false); loadData(); };
+  const handleDeleteLocation = async (id: number) => { 
+    if (window.confirm('Supprimer ?')) {
+       try {
+         await DataService.deleteLocation(id); 
+         loadData();
+       } catch (e: any) {
+         alert("Erreur: " + (e.message || JSON.stringify(e)));
+       }
+    }
+  };
+  const handleLocationSubmit = async (e: React.FormEvent) => { 
+    e.preventDefault(); 
+    try {
+      if (currentLocation.location_id) await DataService.updateLocation(currentLocation.location_id, currentLocation); 
+      else await DataService.addLocation(currentLocation as any); 
+      setIsLocationModalOpen(false); 
+      loadData();
+    } catch (e: any) {
+      alert("Erreur: " + (e.message || JSON.stringify(e)));
+    }
+  };
 
   return (
     <div className="flex flex-col md:flex-row gap-6 h-full">
@@ -54,12 +101,25 @@ export const Settings: React.FC = () => {
               <table className="table">
                 <thead><tr><th>Nom</th><th>Email</th><th>Téléphone</th><th className="text-right">Actions</th></tr></thead>
                 <tbody>
-                  {customers.map(c => (
-                    <tr key={c.customer_id} className="hover">
-                      <td className="font-bold">{c.name}</td><td>{c.email}</td><td>{c.phone}</td>
-                      <td className="text-right"><button onClick={() => handleOpenCustomerEdit(c)} className="btn btn-ghost btn-xs"><Edit size={16}/></button><button onClick={() => handleDeleteCustomer(c.customer_id)} className="btn btn-ghost btn-xs text-error"><Trash2 size={16}/></button></td>
-                    </tr>
-                  ))}
+                  {customers.map(c => {
+                    const isUsed = usedCustomerNames.has(c.name);
+                    return (
+                      <tr key={c.customer_id} className="hover">
+                        <td className="font-bold">{c.name}</td><td>{c.email}</td><td>{c.phone}</td>
+                        <td className="text-right">
+                          <button onClick={() => handleOpenCustomerEdit(c)} className="btn btn-ghost btn-xs"><Edit size={16}/></button>
+                          <button 
+                            onClick={() => !isUsed && handleDeleteCustomer(c.customer_id)} 
+                            className={`btn btn-ghost btn-xs ${isUsed ? 'opacity-20 cursor-not-allowed' : 'text-error'}`}
+                            disabled={isUsed}
+                            title={isUsed ? "Ce client est associé à des livraisons et ne peut pas être supprimé." : "Supprimer"}
+                          >
+                            <Trash2 size={16}/>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {customers.length === 0 && <tr><td colSpan={4} className="text-center">Aucun client</td></tr>}
                 </tbody>
               </table>
@@ -71,7 +131,10 @@ export const Settings: React.FC = () => {
             <div className="grid gap-4">
               {locations.map(loc => (
                 <div key={loc.location_id} className="bg-base-200/50 border border-base-300 p-4 rounded-lg flex items-center justify-between hover:bg-base-200 transition-colors">
-                  <div><h4 className="font-bold">{loc.name}</h4><p className="text-sm opacity-70 mt-1">{loc.pickup_location} <span className="text-primary mx-2">→</span> {loc.delivery_location}</p></div>
+                  <div>
+                    <h4 className="font-bold">{loc.name}</h4>
+                    <p className="text-sm opacity-70 mt-1">{loc.address}</p>
+                  </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right"><span className="block text-xl font-bold text-info">{loc.distance_km} km</span><span className="text-xs opacity-60">Distance</span></div>
                     <div className="flex gap-1 pl-4 border-l border-base-content/10"><button onClick={() => handleOpenLocationEdit(loc)} className="btn btn-ghost btn-xs"><Edit size={16}/></button><button onClick={() => handleDeleteLocation(loc.location_id)} className="btn btn-ghost btn-xs text-error"><Trash2 size={16}/></button></div>
@@ -97,13 +160,11 @@ export const Settings: React.FC = () => {
 
       <Modal isOpen={isLocationModalOpen} onClose={() => setIsLocationModalOpen(false)} title={currentLocation.location_id ? "Modifier Route" : "Nouvelle Route"}>
         <form onSubmit={handleLocationSubmit} className="space-y-4">
-          <div className="form-control"><label className="label">Nom Route</label><input required className="input input-bordered" value={currentLocation.name || ''} onChange={e => setCurrentLocation({...currentLocation, name: e.target.value})} /></div>
+          <div className="form-control"><label className="label">Nom (ex: Dakar -&gt; Mbour)</label><input required className="input input-bordered" value={currentLocation.name || ''} onChange={e => setCurrentLocation({...currentLocation, name: e.target.value})} /></div>
+          <div className="form-control"><label className="label">Adresse / Point de départ</label><input className="input input-bordered" value={currentLocation.address || ''} onChange={e => setCurrentLocation({...currentLocation, address: e.target.value})} /></div>
+          
           <div className="grid grid-cols-2 gap-4">
-            <div className="form-control"><label className="label">Départ</label><input className="input input-bordered" value={currentLocation.pickup_location || ''} onChange={e => setCurrentLocation({...currentLocation, pickup_location: e.target.value})} /></div>
-            <div className="form-control"><label className="label">Arrivée</label><input className="input input-bordered" value={currentLocation.delivery_location || ''} onChange={e => setCurrentLocation({...currentLocation, delivery_location: e.target.value})} /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="form-control"><label className="label">Distance</label><input type="number" className="input input-bordered" value={currentLocation.distance_km || 0} onChange={e => setCurrentLocation({...currentLocation, distance_km: Number(e.target.value)})} /></div>
+            <div className="form-control"><label className="label">Distance (km)</label><input type="number" className="input input-bordered" value={currentLocation.distance_km || 0} onChange={e => setCurrentLocation({...currentLocation, distance_km: Number(e.target.value)})} /></div>
             <div className="form-control"><label className="label">Type</label><input className="input input-bordered" placeholder="ex: Site..." value={currentLocation.location_type || ''} onChange={e => setCurrentLocation({...currentLocation, location_type: e.target.value})} /></div>
           </div>
           <div className="modal-action"><Button type="button" variant="ghost" onClick={() => setIsLocationModalOpen(false)}>Annuler</Button><Button type="submit">Enregistrer</Button></div>

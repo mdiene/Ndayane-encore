@@ -1,5 +1,6 @@
+
 import { supabase } from '../supabaseClient';
-import { Owner, Truck, Driver, Delivery, Customer, Location } from '../types';
+import { Owner, Truck, Driver, Delivery, Customer, Location, DeliveryDetail } from '../types';
 
 export const DataService = {
   // --- OWNERS ---
@@ -105,6 +106,15 @@ export const DataService = {
     }
     return data as Customer[];
   },
+  // Check if customers are used in deliveries to prevent deletion
+  getUsedCustomerNames: async (): Promise<Set<string>> => {
+    const { data, error } = await supabase.from('deliveries').select('customer_name');
+    if (error) { 
+      console.error('Error fetching used customers:', JSON.stringify(error)); 
+      return new Set();
+    }
+    return new Set(data?.map((d: any) => d.customer_name) || []);
+  },
   addCustomer: async (customer: Omit<Customer, 'customer_id'>) => {
     const { data, error } = await supabase.from('customers').insert([customer]).select().single();
     if (error) throw error;
@@ -128,17 +138,34 @@ export const DataService = {
       console.error('Error fetching locations:', JSON.stringify(error)); 
       return []; 
     }
-    return data as Location[];
+    // Map database columns to app type
+    return data.map((l: any) => ({
+      ...l,
+      distance_km: l.location_distance // Map location_distance to distance_km
+    })) as Location[];
   },
   addLocation: async (location: Omit<Location, 'location_id'>) => {
-    const { data, error } = await supabase.from('locations').insert([location]).select().single();
+    // Map app type to database columns
+    const payload = {
+      name: location.name,
+      address: location.address,
+      location_type: location.location_type,
+      location_distance: location.distance_km // Map distance_km to location_distance
+    };
+    const { data, error } = await supabase.from('locations').insert([payload]).select().single();
     if (error) throw error;
-    return data;
+    return { ...data, distance_km: data.location_distance };
   },
   updateLocation: async (id: number, updates: Partial<Location>) => {
-    const { data, error } = await supabase.from('locations').update(updates).eq('location_id', id).select().single();
+    const payload: any = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.address !== undefined) payload.address = updates.address;
+    if (updates.location_type !== undefined) payload.location_type = updates.location_type;
+    if (updates.distance_km !== undefined) payload.location_distance = updates.distance_km;
+
+    const { data, error } = await supabase.from('locations').update(payload).eq('location_id', id).select().single();
     if (error) throw error;
-    return data;
+    return { ...data, distance_km: data.location_distance };
   },
   deleteLocation: async (id: number) => {
     const { error } = await supabase.from('locations').delete().eq('location_id', id);
@@ -148,10 +175,10 @@ export const DataService = {
 
   // --- DELIVERIES ---
   getDeliveries: async (): Promise<Delivery[]> => {
-    // 1. Fetch Deliveries
+    // 1. Fetch Deliveries and left join details including expense fields
     const { data: deliveries, error: deliveryError } = await supabase
       .from('deliveries')
-      .select('*')
+      .select('*, detail_deliveries(id_detail_livraison, frais_de_route, frais_gazoil, frais_de_payage, charge_journaliere, frais_divers)')
       .order('delivery_id', { ascending: false });
 
     if (deliveryError) {
@@ -182,16 +209,36 @@ export const DataService = {
 
     return deliveries.map((d: any) => {
       const ownerInfo = truckMap.get(d.truck_id);
+      
+      // Check if details exist and calculate total expenses
+      const detailsArray = d.detail_deliveries;
+      const hasDetails = Array.isArray(detailsArray) && detailsArray.length > 0;
+      
+      let totalExpenses = 0;
+      if (hasDetails) {
+        const details = detailsArray[0];
+        totalExpenses = (details.frais_de_route || 0) + 
+                        (details.frais_gazoil || 0) + 
+                        (details.frais_de_payage || 0) + 
+                        (details.charge_journaliere || 0) + 
+                        (details.frais_divers || 0);
+      }
+
+      // Remove the detail_deliveries property from the object we return to avoid clutter
+      const { detail_deliveries, ...deliveryData } = d;
+
       return {
-        ...d,
+        ...deliveryData,
+        has_details: hasDetails,
+        total_expenses: hasDetails ? totalExpenses : undefined,
         owner_id: ownerInfo?.owner_id,
         owner_name: ownerInfo?.owner_name
       };
     }) as Delivery[];
   },
 
-  addDelivery: async (delivery: Omit<Delivery, 'delivery_id' | 'owner_name' | 'owner_id'>) => {
-    const { owner_name, owner_id, ...cleanDelivery } = delivery as any;
+  addDelivery: async (delivery: Omit<Delivery, 'delivery_id' | 'owner_name' | 'owner_id' | 'has_details' | 'total_expenses'>) => {
+    const { owner_name, owner_id, has_details, total_expenses, ...cleanDelivery } = delivery as any;
     const payload = {
         ...cleanDelivery,
         cargo_weight_kg: delivery.cargo_weight_kg === 0 || delivery.cargo_weight_kg === null ? null : delivery.cargo_weight_kg,
@@ -206,7 +253,7 @@ export const DataService = {
   },
 
   updateDelivery: async (id: number, updates: Partial<Delivery>) => {
-    const { owner_name, owner_id, ...cleanUpdates } = updates as any;
+    const { owner_name, owner_id, has_details, total_expenses, ...cleanUpdates } = updates as any;
     
     // Clean numeric fields
     if (cleanUpdates.cargo_weight_kg === '' || cleanUpdates.cargo_weight_kg === 0) cleanUpdates.cargo_weight_kg = null;
@@ -221,5 +268,42 @@ export const DataService = {
     const { error } = await supabase.from('deliveries').delete().eq('delivery_id', id);
     if (error) throw error;
     return true;
+  },
+
+  // --- DELIVERY DETAILS (EXPENSES) ---
+  getDeliveryDetail: async (deliveryId: number): Promise<DeliveryDetail | null> => {
+    const { data, error } = await supabase
+      .from('detail_deliveries')
+      .select('*')
+      .eq('delivery_id', deliveryId)
+      .maybeSingle();
+      
+    if (error) {
+      console.error('Error fetching delivery detail:', JSON.stringify(error));
+      throw error;
+    }
+    return data as DeliveryDetail;
+  },
+
+  saveDeliveryDetail: async (detail: Partial<DeliveryDetail>) => {
+    // If id exists, update; otherwise insert
+    if (detail.id_detail_livraison) {
+       const { data, error } = await supabase
+         .from('detail_deliveries')
+         .update(detail)
+         .eq('id_detail_livraison', detail.id_detail_livraison)
+         .select()
+         .single();
+       if (error) throw error;
+       return data;
+    } else {
+       const { data, error } = await supabase
+         .from('detail_deliveries')
+         .insert([detail])
+         .select()
+         .single();
+       if (error) throw error;
+       return data;
+    }
   }
 };

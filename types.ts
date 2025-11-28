@@ -1,3 +1,4 @@
+
 export type OwnerType = 'Individuel' | 'Entreprise';
 export type TruckType = 'Semi remorque' | '10 roues' | '12 roues' | 'plateau';
 export type TruckStatus = 'active' | 'en_transit' | 'maintenance' | 'demobilise';
@@ -52,11 +53,21 @@ export interface Customer {
 export interface Location {
   location_id: number;
   name: string;
-  address: string;
-  location_type: string;
-  pickup_location?: string;
-  delivery_location?: string;
-  distance_km: number;
+  address: string | null;
+  location_type: string | null;
+  distance_km: number; // Mapped from location_distance
+}
+
+export interface DeliveryDetail {
+  id_detail_livraison: string;
+  delivery_id: number;
+  frais_de_route: number | null;
+  frais_gazoil: number | null;
+  frais_de_payage: number | null;
+  charge_journaliere: number | null;
+  frais_divers: number | null;
+  notes: string | null;
+  created_at?: string;
 }
 
 export interface Delivery {
@@ -69,13 +80,15 @@ export interface Delivery {
   customer_name: string;
   pickup_location: string;
   delivery_location: string;
-  delivery_location_id?: number | null; // New field
+  delivery_location_id?: number | null;
   pickup_date: string;
   expected_delivery_date: string;
   actual_delivery_date?: string | null;
-  cargo_description?: string; // Optional
-  cargo_weight_kg: number | null; // Nullable for empty state
-  distance_km: number | null; // Nullable for empty state
+  cargo_description?: string;
+  cargo_weight_kg: number | null;
+  distance_km: number | null;
   delivery_status: DeliveryStatus;
   notes: string;
+  has_details?: boolean; // Flag to indicate if detail_deliveries record exists
+  total_expenses?: number; // Calculated total of expenses
 }
