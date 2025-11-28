@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Truck, Package, Scale, Activity } from 'lucide-react';
+import { Truck, Package, Scale, Activity, Filter } from 'lucide-react';
 import { DataService } from '../services/dataService';
 import { Delivery, Truck as TruckType, Owner } from '../types';
 import { Badge, getStatusBadgeVariant } from './ui/Badge';
@@ -10,6 +10,10 @@ export const Dashboard: React.FC = () => {
   const [trucks, setTrucks] = useState<TruckType[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filter States
+  const [chartTimeFilter, setChartTimeFilter] = useState<'7days' | '30days'>('30days');
+  const [chartOwnerFilter, setChartOwnerFilter] = useState<string>('all');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -32,7 +36,7 @@ export const Dashboard: React.FC = () => {
   const activeTrucks = trucks.filter(t => t.status === 'active' || t.status === 'en_transit').length;
   const efficiency = 94; // Mocked calculation
 
-  // Chart Data Preparation
+  // Area Chart Data (Mocked for visual consistency as per original prompt, or could be dynamic too)
   const weightData = [
     { name: 'Lun', weight: 4000 },
     { name: 'Mar', weight: 3000 },
@@ -43,12 +47,104 @@ export const Dashboard: React.FC = () => {
     { name: 'Dim', weight: 1000 },
   ];
 
-  const volumeData = [
-    { name: 'Sem 1', livraisons: 45 },
-    { name: 'Sem 2', livraisons: 52 },
-    { name: 'Sem 3', livraisons: 38 },
-    { name: 'Sem 4', livraisons: 65 },
-  ];
+  // --- Dynamic Bar Chart Data Logic ---
+  const getVolumeData = () => {
+    const now = new Date();
+    // Store both count and weight
+    const dataMap = new Map<string, { count: number; weight: number }>();
+    
+    // 1. Filter Deliveries
+    let filtered = deliveries;
+    
+    // Filter by Owner
+    if (chartOwnerFilter !== 'all') {
+      filtered = filtered.filter(d => d.owner_id === Number(chartOwnerFilter));
+    }
+
+    // Filter by Time & Grouping
+    if (chartTimeFilter === '7days') {
+      // Last 7 days: Group by Day
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 6); // Include today
+      cutoff.setHours(0, 0, 0, 0);
+
+      // Initialize last 7 days with 0
+      for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - i));
+        const dayName = d.toLocaleDateString('fr-FR', { weekday: 'short' });
+        dataMap.set(dayName, { count: 0, weight: 0 });
+      }
+
+      filtered.forEach(d => {
+        const date = new Date(d.pickup_date);
+        if (date >= cutoff) {
+          const dayName = date.toLocaleDateString('fr-FR', { weekday: 'short' });
+          const current = dataMap.get(dayName) || { count: 0, weight: 0 };
+          dataMap.set(dayName, { 
+            count: current.count + 1, 
+            weight: current.weight + (d.cargo_weight_kg || 0)
+          });
+        }
+      });
+
+    } else {
+      // Last 30 days: Group by Week
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      cutoff.setHours(0, 0, 0, 0);
+
+      // Initialize 4 weeks
+      for (let i = 1; i <= 4; i++) {
+        dataMap.set(`Sem ${i}`, { count: 0, weight: 0 });
+      }
+
+      filtered.forEach(d => {
+        const date = new Date(d.pickup_date);
+        if (date >= cutoff) {
+          // Simple week calculation relative to cutoff
+          const diffTime = Math.abs(date.getTime() - cutoff.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+          const weekNum = Math.min(Math.ceil(diffDays / 7), 4); // Cap at 4 weeks
+          const key = `Sem ${weekNum}`;
+          const current = dataMap.get(key) || { count: 0, weight: 0 };
+          dataMap.set(key, { 
+            count: current.count + 1, 
+            weight: current.weight + (d.cargo_weight_kg || 0)
+          });
+        }
+      });
+    }
+
+    // Convert Map to Array
+    return Array.from(dataMap).map(([name, data]) => ({ 
+      name, 
+      livraisons: data.count,
+      poids: data.weight / 1000 // Convert to Tonnes
+    }));
+  };
+
+  const volumeData = getVolumeData();
+
+  // Custom Tooltip
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg shadow-xl text-sm">
+          <p className="text-slate-300 font-medium mb-2 border-b border-slate-700 pb-1">{label}</p>
+          <p className="text-violet-400 mb-1 flex justify-between gap-4">
+            <span>Livraisons:</span> 
+            <span className="font-bold text-white">{payload[0].value}</span>
+          </p>
+          <p className="text-blue-400 flex justify-between gap-4">
+            <span>Poids Total:</span> 
+            <span className="font-bold text-white">{payload[0].payload.poids.toFixed(1)} T</span>
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   // Owner Rankings
   const ownerStats = owners.map(owner => {
@@ -101,6 +197,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Area Chart */}
         <div className="glass-panel p-6 rounded-xl">
           <h3 className="text-lg font-semibold text-white mb-4">Poids transporté (7 derniers jours)</h3>
           <div className="h-[300px]">
@@ -125,18 +222,46 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Bar Chart with Filters */}
         <div className="glass-panel p-6 rounded-xl">
-          <h3 className="text-lg font-semibold text-white mb-4">Volume de Livraisons (Mensuel)</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+            <h3 className="text-lg font-semibold text-white">Volume Livraisons</h3>
+            
+            <div className="flex items-center gap-2">
+              {/* Time Filter */}
+              <div className="relative">
+                <select 
+                  className="appearance-none bg-slate-900 border border-slate-700 text-xs text-white rounded-lg pl-3 pr-8 py-1.5 focus:outline-none focus:border-blue-500"
+                  value={chartTimeFilter}
+                  onChange={(e) => setChartTimeFilter(e.target.value as '7days' | '30days')}
+                >
+                  <option value="7days">7 derniers jours</option>
+                  <option value="30days">30 derniers jours</option>
+                </select>
+                <Filter size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+
+              {/* Owner Filter */}
+              <select 
+                className="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500 max-w-[150px]"
+                value={chartOwnerFilter}
+                onChange={(e) => setChartOwnerFilter(e.target.value)}
+              >
+                <option value="all">Tous Propriétaires</option>
+                {owners.map(o => (
+                  <option key={o.owner_id} value={o.owner_id}>{o.owner_name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={volumeData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                 <XAxis dataKey="name" stroke="#64748b" />
-                <YAxis stroke="#64748b" />
-                <Tooltip 
-                  cursor={{fill: 'rgba(255,255,255,0.05)'}}
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} 
-                />
+                <YAxis stroke="#64748b" allowDecimals={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
                 <Bar dataKey="livraisons" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -164,6 +289,7 @@ export const Dashboard: React.FC = () => {
                   <span className="text-sm font-medium text-blue-400">{owner.totalWeight.toFixed(1)} T</span>
                 </li>
               ))}
+              {ownerStats.length === 0 && <p className="text-sm text-slate-500 text-center py-2">Aucune donnée</p>}
             </ul>
           </div>
         </div>
@@ -198,6 +324,9 @@ export const Dashboard: React.FC = () => {
                     </td>
                   </tr>
                 ))}
+                {deliveries.length === 0 && (
+                  <tr><td colSpan={5} className="text-center py-4 text-slate-500">Aucune livraison récente</td></tr>
+                )}
               </tbody>
             </table>
           </div>

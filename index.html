@@ -26,9 +26,14 @@
     </script>
     <style>
       body {
+        background-color: #f8fafc; /* slate-50 */
+        color: #0f172a; /* slate-900 */
+        font-family: 'Inter', sans-serif;
+        transition: background-color 0.3s, color 0.3s;
+      }
+      .dark body {
         background-color: #020617; /* slate-950 */
         color: #f8fafc; /* slate-50 */
-        font-family: 'Inter', sans-serif;
       }
       /* Custom Scrollbar */
       ::-webkit-scrollbar {
@@ -45,10 +50,17 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #475569; 
       }
+      
       .glass-panel {
-        background: rgba(15, 23, 42, 0.6);
+        background: rgba(255, 255, 255, 0.7);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        transition: background-color 0.3s, border-color 0.3s;
+      }
+      
+      .dark .glass-panel {
+        background: rgba(15, 23, 42, 0.6);
         border: 1px solid rgba(255, 255, 255, 0.1);
       }
     </style>
