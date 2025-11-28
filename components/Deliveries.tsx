@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { DataService } from '../services/dataService';
-import { Delivery, Truck, Driver, Customer, Location, DeliveryDetail } from '../types';
+import { Delivery, Truck, Driver, Customer, Location, DeliveryDetail, Owner } from '../types';
 import { Badge, getStatusBadgeVariant } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
-import { MapPin, Calendar, Truck as TruckIcon, User, Package, Plus, Trash2, Edit, CheckCircle, Info, Coins, Calculator, TrendingUp } from 'lucide-react';
+import { MapPin, Calendar, Truck as TruckIcon, User, Package, Plus, Trash2, Edit, CheckCircle, Info, Coins, Calculator, TrendingUp, Filter } from 'lucide-react';
 
 export const Deliveries: React.FC = () => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -13,7 +13,11 @@ export const Deliveries: React.FC = () => {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [owners, setOwners] = useState<Owner[]>([]); // Added owners state
   
+  // Filter State
+  const [filterOwnerId, setFilterOwnerId] = useState<string>('all');
+
   // Modals
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -32,11 +36,23 @@ export const Deliveries: React.FC = () => {
   useEffect(() => { refreshData(); }, []);
 
   const refreshData = async () => {
-    const [d, t, dr, c, l] = await Promise.all([DataService.getDeliveries(), DataService.getTrucks(), DataService.getDrivers(), DataService.getCustomers(), DataService.getLocations()]);
-    setDeliveries(d); setTrucks(t); setDrivers(dr); setCustomers(c); setLocations(l);
+    const [d, t, dr, c, l, o] = await Promise.all([
+      DataService.getDeliveries(), 
+      DataService.getTrucks(), 
+      DataService.getDrivers(), 
+      DataService.getCustomers(), 
+      DataService.getLocations(),
+      DataService.getOwners()
+    ]);
+    setDeliveries(d); setTrucks(t); setDrivers(dr); setCustomers(c); setLocations(l); setOwners(o);
   };
 
-  const groupedDeliveries = deliveries.reduce((acc, delivery) => {
+  // Filter deliveries based on selection
+  const filteredDeliveries = filterOwnerId === 'all' 
+    ? deliveries 
+    : deliveries.filter(d => d.owner_id === Number(filterOwnerId));
+
+  const groupedDeliveries = filteredDeliveries.reduce((acc, delivery) => {
     const owner = delivery.owner_name || 'Inconnu';
     if (!acc[owner]) acc[owner] = [];
     acc[owner].push(delivery);
@@ -181,12 +197,37 @@ export const Deliveries: React.FC = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <h1 className="text-2xl font-bold">Suivi des Livraisons</h1>
-        <Button onClick={handleOpenAdd}><Plus size={18} className="mr-2" /> Nouvelle Livraison</Button>
+        
+        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+          {/* Owner Filter */}
+          <div className="relative w-full sm:w-auto">
+             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50" size={16} />
+             <select 
+                className="select select-bordered w-full pl-10"
+                value={filterOwnerId}
+                onChange={(e) => setFilterOwnerId(e.target.value)}
+             >
+                <option value="all">Tous les propriétaires</option>
+                {owners.map(o => (
+                  <option key={o.owner_id} value={o.owner_id}>{o.owner_name}</option>
+                ))}
+             </select>
+          </div>
+
+          <Button onClick={handleOpenAdd} className="w-full sm:w-auto"><Plus size={18} className="mr-2" /> Nouvelle Livraison</Button>
+        </div>
       </div>
 
       <div className="space-y-8">
+        {Object.entries(groupedDeliveries).length === 0 && (
+            <div className="text-center py-10 opacity-60 bg-base-200 rounded-xl">
+                <Package size={48} className="mx-auto mb-4 opacity-50"/>
+                <p>Aucune livraison trouvée pour ce filtre.</p>
+            </div>
+        )}
+
         {Object.entries(groupedDeliveries).map(([ownerName, items]) => {
           const totalWeight = items.reduce((acc, i) => acc + (i.cargo_weight_kg || 0), 0) / 1000;
           return (

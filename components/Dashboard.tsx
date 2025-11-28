@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Truck, Package, Scale, Activity, Filter } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Brush } from 'recharts';
+import { Truck, Package, Scale, Activity, BarChart2, TrendingUp } from 'lucide-react';
 import { DataService } from '../services/dataService';
 import { Delivery, Truck as TruckType, Owner } from '../types';
 import { Badge, getStatusBadgeVariant } from './ui/Badge';
@@ -14,6 +14,7 @@ export const Dashboard: React.FC = () => {
   // Filter States
   const [chartTimeFilter, setChartTimeFilter] = useState<'7days' | '30days'>('30days');
   const [chartOwnerFilter, setChartOwnerFilter] = useState<string>('all');
+  const [graphType, setGraphType] = useState<'bar' | 'area'>('bar');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -49,62 +50,65 @@ export const Dashboard: React.FC = () => {
 
   // Dynamic Bar Chart Data Logic
   const getVolumeData = () => {
-    const dataMap = new Map<string, { count: number; weight: number }>();
+    const dataMap = new Map<string, { count: number; weight: number; fullDate: string; label: string }>();
+    
+    // Determine range
+    const daysCount = chartTimeFilter === '7days' ? 7 : 30;
+    const endDate = new Date(); // Today
+    
+    // Helper to format local date to YYYY-MM-DD for map keys
+    const getLocalISODate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    // Initialize all days in range with 0 values
+    for (let i = daysCount - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(endDate.getDate() - i);
+        
+        const isoKey = getLocalISODate(d);
+        
+        let label = '';
+        if (chartTimeFilter === '7days') {
+            // e.g. "Lun"
+            label = d.toLocaleDateString('fr-FR', { weekday: 'short' });
+            label = label.charAt(0).toUpperCase() + label.slice(1);
+        } else {
+            // e.g. "15/03"
+            label = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+        }
+        
+        dataMap.set(isoKey, {
+            label,
+            count: 0,
+            weight: 0,
+            fullDate: d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+        });
+    }
+
     let filtered = deliveries;
     if (chartOwnerFilter !== 'all') filtered = filtered.filter(d => d.owner_id === Number(chartOwnerFilter));
 
-    if (chartTimeFilter === '7days') {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 6);
-      cutoff.setHours(0, 0, 0, 0);
-
-      for (let i = 0; i < 7; i++) {
-        const d = new Date();
-        d.setDate(d.getDate() - (6 - i));
-        const dayName = d.toLocaleDateString('fr-FR', { weekday: 'short' });
-        dataMap.set(dayName, { count: 0, weight: 0 });
-      }
-
-      filtered.forEach(d => {
+    filtered.forEach(d => {
+        if (!d.pickup_date) return;
         const date = new Date(d.pickup_date);
-        if (date >= cutoff) {
-          const dayName = date.toLocaleDateString('fr-FR', { weekday: 'short' });
-          const current = dataMap.get(dayName) || { count: 0, weight: 0 };
-          dataMap.set(dayName, { 
-            count: current.count + 1, 
-            weight: current.weight + (d.cargo_weight_kg || 0)
-          });
+        const isoKey = getLocalISODate(date);
+        
+        if (dataMap.has(isoKey)) {
+            const entry = dataMap.get(isoKey)!;
+            entry.count += 1;
+            entry.weight += (d.cargo_weight_kg || 0);
         }
-      });
-    } else {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 30);
-      cutoff.setHours(0, 0, 0, 0);
+    });
 
-      for (let i = 1; i <= 4; i++) {
-        dataMap.set(`Sem ${i}`, { count: 0, weight: 0 });
-      }
-
-      filtered.forEach(d => {
-        const date = new Date(d.pickup_date);
-        if (date >= cutoff) {
-          const diffTime = Math.abs(date.getTime() - cutoff.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-          const weekNum = Math.min(Math.ceil(diffDays / 7), 4);
-          const key = `Sem ${weekNum}`;
-          const current = dataMap.get(key) || { count: 0, weight: 0 };
-          dataMap.set(key, { 
-            count: current.count + 1, 
-            weight: current.weight + (d.cargo_weight_kg || 0)
-          });
-        }
-      });
-    }
-
-    return Array.from(dataMap).map(([name, data]) => ({ 
-      name, 
-      livraisons: data.count,
-      poids: data.weight / 1000
+    return Array.from(dataMap.values()).map(item => ({
+        name: item.label,
+        livraisons: item.count,
+        poids: item.weight / 1000,
+        fullDate: item.fullDate
     }));
   };
 
@@ -112,14 +116,17 @@ export const Dashboard: React.FC = () => {
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const data = payload[0].payload;
       return (
-        <div className="bg-base-300 p-3 rounded-lg shadow-xl text-sm border border-base-100">
-          <p className="font-bold mb-2 pb-1 border-b border-base-content/10">{label}</p>
+        <div className="bg-base-300 p-3 rounded-lg shadow-xl text-sm border border-base-100 z-50">
+          <p className="font-bold mb-2 pb-1 border-b border-base-content/10 capitalize">
+            {data.fullDate || label}
+          </p>
           <p className="text-primary mb-1 flex justify-between gap-4">
             <span>Livraisons:</span> <span className="font-bold">{payload[0].value}</span>
           </p>
           <p className="text-secondary flex justify-between gap-4">
-            <span>Poids:</span> <span className="font-bold">{payload[0].payload.poids.toFixed(1)} T</span>
+            <span>Poids:</span> <span className="font-bold">{data.poids.toFixed(1)} T</span>
           </p>
         </div>
       );
@@ -174,25 +181,42 @@ export const Dashboard: React.FC = () => {
 
         <div className="card bg-base-100 shadow-xl min-w-0">
           <div className="card-body p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between mb-6 gap-4">
               <h3 className="card-title text-base">Volume Livraisons</h3>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="join">
+                    <button 
+                        className={`join-item btn btn-xs ${graphType === 'bar' ? 'btn-active btn-primary' : 'btn-ghost'}`}
+                        onClick={() => setGraphType('bar')}
+                        title="Graphique en barres"
+                    >
+                        <BarChart2 size={14} />
+                    </button>
+                    <button 
+                        className={`join-item btn btn-xs ${graphType === 'area' ? 'btn-active btn-primary' : 'btn-ghost'}`}
+                        onClick={() => setGraphType('area')}
+                        title="Graphique en aire"
+                    >
+                        <TrendingUp size={14} />
+                    </button>
+                </div>
+                <div className="w-px h-4 bg-base-content/20 mx-1"></div>
                 <div className="relative">
                   <select 
                     className="select select-bordered select-xs"
                     value={chartTimeFilter}
                     onChange={(e) => setChartTimeFilter(e.target.value as any)}
                   >
-                    <option value="7days">7 derniers jours</option>
-                    <option value="30days">30 derniers jours</option>
+                    <option value="7days">7 jours</option>
+                    <option value="30days">30 jours</option>
                   </select>
                 </div>
                 <select 
-                  className="select select-bordered select-xs max-w-[150px]"
+                  className="select select-bordered select-xs max-w-[120px]"
                   value={chartOwnerFilter}
                   onChange={(e) => setChartOwnerFilter(e.target.value)}
                 >
-                  <option value="all">Tous Propriétaires</option>
+                  <option value="all">Tous</option>
                   {owners.map(o => (
                     <option key={o.owner_id} value={o.owner_id}>{o.owner_name}</option>
                   ))}
@@ -202,13 +226,73 @@ export const Dashboard: React.FC = () => {
 
             <div className="h-[300px] w-full min-w-0">
               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <BarChart data={volumeData}>
-                  <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-                  <XAxis dataKey="name" strokeOpacity={0.5} />
-                  <YAxis strokeOpacity={0.5} allowDecimals={false} />
-                  <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
-                  <Bar dataKey="livraisons" fill="#377CFB" radius={[4, 4, 0, 0]} />
-                </BarChart>
+                {graphType === 'bar' ? (
+                    <BarChart data={volumeData} margin={{ top: 5, right: 10, bottom: 5, left: -20 }}>
+                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.1} vertical={false} />
+                    <XAxis 
+                        dataKey="name" 
+                        strokeOpacity={0.5} 
+                        tick={{ fontSize: 11 }}
+                        tickMargin={5}
+                    />
+                    <YAxis strokeOpacity={0.5} allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip content={<CustomTooltip />} cursor={{fill: 'oklch(var(--b2))', opacity: 0.4 }} />
+                    <Bar 
+                        dataKey="livraisons" 
+                        fill="#377CFB" 
+                        radius={[4, 4, 0, 0]} 
+                        maxBarSize={50}
+                        animationDuration={1500}
+                    />
+                    {chartTimeFilter === '30days' && (
+                        <Brush 
+                        dataKey="name" 
+                        height={20} 
+                        stroke="#377CFB" 
+                        fill="oklch(var(--b2))"
+                        travellerWidth={10}
+                        tickFormatter={() => ''}
+                        />
+                    )}
+                    </BarChart>
+                ) : (
+                    <AreaChart data={volumeData} margin={{ top: 5, right: 10, bottom: 5, left: -20 }}>
+                        <defs>
+                            <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#377CFB" stopOpacity={0.4}/>
+                                <stop offset="95%" stopColor="#377CFB" stopOpacity={0}/>
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.1} vertical={false} />
+                        <XAxis 
+                            dataKey="name" 
+                            strokeOpacity={0.5} 
+                            tick={{ fontSize: 11 }}
+                            tickMargin={5}
+                        />
+                        <YAxis strokeOpacity={0.5} allowDecimals={false} tick={{ fontSize: 11 }} />
+                        <Tooltip content={<CustomTooltip />} cursor={{stroke: 'oklch(var(--b3))', strokeWidth: 1 }} />
+                        <Area 
+                            type="monotone" 
+                            dataKey="livraisons" 
+                            stroke="#377CFB" 
+                            strokeWidth={2}
+                            fillOpacity={1} 
+                            fill="url(#colorVolume)"
+                            animationDuration={1500}
+                        />
+                         {chartTimeFilter === '30days' && (
+                            <Brush 
+                            dataKey="name" 
+                            height={20} 
+                            stroke="#377CFB" 
+                            fill="oklch(var(--b2))"
+                            travellerWidth={10}
+                            tickFormatter={() => ''}
+                            />
+                        )}
+                    </AreaChart>
+                )}
               </ResponsiveContainer>
             </div>
           </div>
