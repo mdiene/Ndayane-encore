@@ -1,67 +1,26 @@
 <!DOCTYPE html>
-<html lang="fr" class="dark">
+<html lang="fr" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mozaic Logistics</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              background: '#020617', // slate-950
-              surface: '#0f172a', // slate-900
-              primary: '#3b82f6', // blue-500
-              secondary: '#64748b', // slate-500
-              accent: '#8b5cf6', // violet-500
-            },
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-            },
-          },
-        },
-      }
-    </script>
     <style>
-      body {
-        background-color: #f8fafc; /* slate-50 */
-        color: #0f172a; /* slate-900 */
-        font-family: 'Inter', sans-serif;
-        transition: background-color 0.3s, color 0.3s;
-      }
-      .dark body {
-        background-color: #020617; /* slate-950 */
-        color: #f8fafc; /* slate-50 */
-      }
       /* Custom Scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #0f172a; 
+        background-color: oklch(var(--b1));
       }
       ::-webkit-scrollbar-thumb {
-        background: #334155; 
+        background-color: oklch(var(--b3));
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #475569; 
-      }
-      
-      .glass-panel {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(0, 0, 0, 0.05);
-        transition: background-color 0.3s, border-color 0.3s;
-      }
-      
-      .dark .glass-panel {
-        background: rgba(15, 23, 42, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background-color: oklch(var(--bc) / 0.2);
       }
     </style>
   <script type="importmap">

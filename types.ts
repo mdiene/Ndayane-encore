@@ -69,12 +69,13 @@ export interface Delivery {
   customer_name: string;
   pickup_location: string;
   delivery_location: string;
+  delivery_location_id?: number | null; // New field
   pickup_date: string;
   expected_delivery_date: string;
   actual_delivery_date?: string | null;
-  cargo_description: string;
-  cargo_weight_kg: number;
-  distance_km: number;
+  cargo_description?: string; // Optional
+  cargo_weight_kg: number | null; // Nullable for empty state
+  distance_km: number | null; // Nullable for empty state
   delivery_status: DeliveryStatus;
   notes: string;
 }

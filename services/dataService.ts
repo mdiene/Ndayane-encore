@@ -5,7 +5,10 @@ export const DataService = {
   // --- OWNERS ---
   getOwners: async (): Promise<Owner[]> => {
     const { data, error } = await supabase.from('truck_owners').select('*').order('owner_id', { ascending: false });
-    if (error) { console.error('Error fetching owners:', JSON.stringify(error)); return []; }
+    if (error) { 
+      console.error('Error fetching owners:', JSON.stringify(error)); 
+      return []; 
+    }
     return data as Owner[];
   },
   addOwner: async (owner: Omit<Owner, 'owner_id'>) => {
@@ -27,17 +30,28 @@ export const DataService = {
   // --- TRUCKS ---
   getTrucks: async (): Promise<Truck[]> => {
     const { data, error } = await supabase.from('trucks').select(`*, truck_owners (owner_name)`);
-    if (error) { console.error('Error fetching trucks:', JSON.stringify(error)); return []; }
-    return data.map((t: any) => ({ ...t, owner_name: t.truck_owners?.owner_name })) as Truck[];
+    if (error) { 
+      console.error('Error fetching trucks:', JSON.stringify(error)); 
+      return []; 
+    }
+    return data.map((t: any) => {
+        // Handle array or object response from relationship
+        const ownerName = Array.isArray(t.truck_owners) 
+            ? t.truck_owners[0]?.owner_name 
+            : t.truck_owners?.owner_name;
+        return { ...t, owner_name: ownerName };
+    }) as Truck[];
   },
   addTruck: async (truck: Omit<Truck, 'truck_id' | 'owner_name'>) => {
-    const { data, error } = await supabase.from('trucks').insert([truck]).select().single();
+    // Clean potential joined fields if passed by mistake
+    const { owner_name, truck_owners, ...cleanTruck } = truck as any;
+    const { data, error } = await supabase.from('trucks').insert([cleanTruck]).select().single();
     if (error) throw error;
     return data;
   },
   updateTruck: async (id: number, updates: Partial<Truck>) => {
-    // Remove derived fields before sending to Supabase
-    const { owner_name, ...cleanUpdates } = updates as any;
+    // Remove derived fields and joined relationship objects before sending to Supabase
+    const { owner_name, truck_owners, ...cleanUpdates } = updates as any;
     const { data, error } = await supabase.from('trucks').update(cleanUpdates).eq('truck_id', id).select().single();
     if (error) throw error;
     return data;
@@ -51,16 +65,27 @@ export const DataService = {
   // --- DRIVERS ---
   getDrivers: async (): Promise<Driver[]> => {
     const { data, error } = await supabase.from('drivers').select(`*, trucks (license_plate)`);
-    if (error) { console.error('Error fetching drivers:', JSON.stringify(error)); return []; }
-    return data.map((d: any) => ({ ...d, truck_plate: d.trucks?.license_plate })) as Driver[];
+    if (error) { 
+      console.error('Error fetching drivers:', JSON.stringify(error)); 
+      return []; 
+    }
+    return data.map((d: any) => {
+        const plate = Array.isArray(d.trucks) 
+            ? d.trucks[0]?.license_plate 
+            : d.trucks?.license_plate;
+        return { ...d, truck_plate: plate };
+    }) as Driver[];
   },
   addDriver: async (driver: Omit<Driver, 'driver_id' | 'truck_plate'>) => {
-    const { data, error } = await supabase.from('drivers').insert([driver]).select().single();
+    // Clean potentially joined fields
+    const { truck_plate, trucks, ...cleanDriver } = driver as any;
+    const { data, error } = await supabase.from('drivers').insert([cleanDriver]).select().single();
     if (error) throw error;
     return data;
   },
   updateDriver: async (id: number, updates: Partial<Driver>) => {
-    const { truck_plate, ...cleanUpdates } = updates as any;
+    // Remove joined 'trucks' object and 'truck_plate' helper
+    const { truck_plate, trucks, ...cleanUpdates } = updates as any;
     const { data, error } = await supabase.from('drivers').update(cleanUpdates).eq('driver_id', id).select().single();
     if (error) throw error;
     return data;
@@ -74,7 +99,10 @@ export const DataService = {
   // --- CUSTOMERS ---
   getCustomers: async (): Promise<Customer[]> => {
     const { data, error } = await supabase.from('customers').select('*').order('customer_id', { ascending: false });
-    if (error) { console.error('Error fetching customers:', JSON.stringify(error)); return []; }
+    if (error) { 
+      console.error('Error fetching customers:', JSON.stringify(error)); 
+      return []; 
+    }
     return data as Customer[];
   },
   addCustomer: async (customer: Omit<Customer, 'customer_id'>) => {
@@ -96,7 +124,10 @@ export const DataService = {
   // --- LOCATIONS ---
   getLocations: async (): Promise<Location[]> => {
     const { data, error } = await supabase.from('locations').select('*').order('location_id', { ascending: false });
-    if (error) { console.error('Error fetching locations:', JSON.stringify(error)); return []; }
+    if (error) { 
+      console.error('Error fetching locations:', JSON.stringify(error)); 
+      return []; 
+    }
     return data as Location[];
   },
   addLocation: async (location: Omit<Location, 'location_id'>) => {
@@ -137,11 +168,17 @@ export const DataService = {
 
     if (truckError) {
       console.error('Error fetching trucks for delivery join:', JSON.stringify(truckError));
+      // Return deliveries even if truck join fails, albeit without owner info
       return deliveries as Delivery[];
     }
 
     const truckMap = new Map();
-    trucks?.forEach((t: any) => truckMap.set(t.truck_id, t.truck_owners));
+    trucks?.forEach((t: any) => {
+        // Handle array vs object response from Supabase relationship
+        const owners = t.truck_owners;
+        const owner = Array.isArray(owners) ? owners[0] : owners;
+        truckMap.set(t.truck_id, owner);
+    });
 
     return deliveries.map((d: any) => {
       const ownerInfo = truckMap.get(d.truck_id);
@@ -154,14 +191,27 @@ export const DataService = {
   },
 
   addDelivery: async (delivery: Omit<Delivery, 'delivery_id' | 'owner_name' | 'owner_id'>) => {
-    const { data, error } = await supabase.from('deliveries').insert([delivery]).select().single();
+    const { owner_name, owner_id, ...cleanDelivery } = delivery as any;
+    const payload = {
+        ...cleanDelivery,
+        cargo_weight_kg: delivery.cargo_weight_kg === 0 || delivery.cargo_weight_kg === null ? null : delivery.cargo_weight_kg,
+        distance_km: delivery.distance_km === 0 || delivery.distance_km === null ? null : delivery.distance_km,
+        cargo_description: delivery.cargo_description || null,
+        delivery_location_id: delivery.delivery_location_id || null
+    };
+
+    const { data, error } = await supabase.from('deliveries').insert([payload]).select().single();
     if (error) throw error;
     return data;
   },
 
   updateDelivery: async (id: number, updates: Partial<Delivery>) => {
-    // Remove helper fields
     const { owner_name, owner_id, ...cleanUpdates } = updates as any;
+    
+    // Clean numeric fields
+    if (cleanUpdates.cargo_weight_kg === '' || cleanUpdates.cargo_weight_kg === 0) cleanUpdates.cargo_weight_kg = null;
+    if (cleanUpdates.distance_km === '' || cleanUpdates.distance_km === 0) cleanUpdates.distance_km = null;
+    
     const { data, error } = await supabase.from('deliveries').update(cleanUpdates).eq('delivery_id', id).select().single();
     if (error) throw error;
     return data;

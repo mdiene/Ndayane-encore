@@ -20,32 +20,31 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
 
   if (!isOpen) return null;
 
-  const maxWidths = {
+  const widthClasses = {
     md: 'max-w-md',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl',
+    lg: 'max-w-3xl',
+    xl: 'max-w-5xl',
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
-        onClick={onClose}
-      />
-      <div className={`relative w-full ${maxWidths[size]} glass-panel rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200`}>
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
+    <dialog className="modal modal-open modal-bottom sm:modal-middle">
+      <div className="modal-backdrop" onClick={onClose}>
+        <button>close</button>
+      </div>
+      <div className={`modal-box ${widthClasses[size]} p-0 overflow-hidden`}>
+        <div className="flex items-center justify-between p-4 border-b border-base-300 bg-base-200">
+          <h3 className="font-bold text-lg">{title}</h3>
           <button 
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors"
+            className="btn btn-sm btn-circle btn-ghost"
           >
             <X size={20} />
           </button>
         </div>
-        <div className="p-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
+        <div className="p-6 max-h-[calc(100vh-10rem)] overflow-y-auto">
           {children}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 };
