@@ -149,11 +149,11 @@ export const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card bg-base-100 shadow-xl">
+        <div className="card bg-base-100 shadow-xl min-w-0">
           <div className="card-body p-6">
             <h3 className="card-title text-base mb-4">Poids transporté (7 derniers jours)</h3>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[300px] w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <AreaChart data={weightData}>
                   <defs>
                     <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
@@ -172,7 +172,7 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="card bg-base-100 shadow-xl">
+        <div className="card bg-base-100 shadow-xl min-w-0">
           <div className="card-body p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
               <h3 className="card-title text-base">Volume Livraisons</h3>
@@ -200,8 +200,8 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[300px] w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <BarChart data={volumeData}>
                   <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
                   <XAxis dataKey="name" strokeOpacity={0.5} />
